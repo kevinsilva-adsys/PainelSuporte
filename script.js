@@ -1,16 +1,4 @@
-// CONFIGURAÇÕES DO TELEGRAM
-const TELEGRAM_CONFIGS = [
-    {
-        "token": "7560009900:AAFybrI4nhJh9G--BKkij2ubCH-owOtxpTE",
-        "chat_id": "5334901770"
-    },
-    {
-        "token": "8322506775:AAExfeXuWxxLoFR7f6qaDGcDQJzDmdC2xsY", 
-        "chat_id": "7195267585"
-    }
-];
-
-// Lista de municípios
+// Lista inicial de municípios e suas URLs
 const municipios = [
     {"id": "alfenas-mg", "name": "Alfenas - MG", "url": "https://www.alfenas-mg.vivver.com/login"},
     {"id": "almenara-mg", "name": "Almenara - MG", "url": "https://almenara-mg.vivver.com/login"},
@@ -24,7 +12,6 @@ const municipios = [
     {"id": "buritizeiro-mg", "name": "Buritizeiro - MG", "url": "https://www.buritizeiro-mg.vivver.com/login"},
     {"id": "campanha-mg", "name": "Campanha - MG", "url": "https://www.campanha-mg.vivver.com/login"},
     {"id": "camposaltos-mg", "name": "Campos Altos - MG", "url": "https://camposaltos-mg.vivver.com/login"},
-    {"id": "cantagalo-mg", "name": "Cantagalo - MG", "url": "https://cantagalo-mg.vivver.com/login"},
     {"id": "carai-mg", "name": "Caraí - MG", "url": "https://www.carai-mg.vivver.com/login"},
     {"id": "carmodocajuru-mg", "name": "Carmo do Cajuru - MG", "url": "https://www.carmodocajuru-mg.vivver.com/login"},
     {"id": "carmodoparanaiba-mg", "name": "Carmo do Paranaíba - MG", "url": "http://www.carmodoparanaiba-mg.vivver.com/login"},
@@ -108,7 +95,7 @@ const municipios = [
     {"id": "ourobranco-mg", "name": "Ouro Branco - MG", "url": "http://www.ourobranco-mg.vivver.com/login"},
     {"id": "ourobranco-mg-tst", "name": "Ouro Branco - MG[TST]", "url": "https://ourobranco-mg-tst.vivver.com/login"},
     {"id": "paraguacu-mg", "name": "Paraguaçu - MG", "url": "http://www.paraguacu-mg.vivver.com/login"},
-    {"id": "parnaiba-pi", "name": "Parnaíba - PI[BIG DATA]", "url": "https://cuidarpi.parnaiba.saude.pi.gov.br/login"},
+    {"id": "parnaiba-pi", "name": "Panaíba - PI[BIG DATA]", "url": "https://cuidarpi.parnaiba.saude.pi.gov.br/login"},
     {"id": "passos-mg", "name": "Passos - MG", "url": "https://www.passos-mg.vivver.com/login"},
     {"id": "passos-mg-tst", "name": "Passos - MG[TST]", "url": "https://www.passos-mg-tst.vivver.com/login"},
     {"id": "patosdeminas-mg", "name": "Patos de Minas - MG", "url": "http://www.patosdeminas-mg.vivver.com/login"},
@@ -162,383 +149,331 @@ const municipios = [
     {"id": "tv-4", "name": "TV-4", "url": "https://tv4-fila.vivver.com"}
 ];
 
-// ===============================
-// CONTROLE GLOBAL
-// ===============================
-let atualizacaoEmAndamento = false;
-
-// ===============================
-// CONTAINER
-// ===============================
+// Container da página
 const container = document.getElementById("municipios");
 const updateInfo = document.getElementById("update-info");
-
 let resultados = [];
 let todosMunicipios = [];
-let statusAnterior = {};
 
-// ===============================
-// TELEGRAM
-// ===============================
-async function enviarAlertaTelegram(site, statusCode) {
-    const message = `${site.name}
-${site.url}
-[QUEDA]
-Status: ${statusCode}
-Hora: ${new Date().toLocaleString('pt-BR')}`;
-
-    for (const config of TELEGRAM_CONFIGS) {
-        try {
-            const url = `https://api.telegram.org/bot${config.token}/sendMessage`;
-            await axios.post(url, {
-                chat_id: config.chat_id,
-                text: message
-            });
-            console.log(`✅ Alerta enviado: ${site.name}`);
-        } catch (error) {
-            console.error('❌ Erro Telegram:', error);
-        }
-    }
-}
-
-// ===============================
-// BOTÃO
-// ===============================
+// Função para criar botão com link
 function criarBotaoMunicipio(municipio, status, versao = null) {
-    const button = document.createElement("button");
-    button.className = `municipio-btn ${status ? 'ok' : 'erro'}`;
-
-    button.innerHTML = `
-        <span class="municipio-name">${municipio.name}</span>
-        ${versao ? `<span class="municipio-version">${versao}</span>` : ''}
-        <span class="municipio-status">${status ? 'Online' : 'Offline'}</span>
-    `;
-
-    button.onclick = () => window.open(municipio.url, '_blank');
-    button.title = `${municipio.url}\nStatus: ${status ? 'Online' : 'Offline'}`;
-
-    return button;
+  const button = document.createElement("button");
+  button.className = `municipio-btn ${status ? 'ok' : 'erro'}`;
+  
+  let versaoHtml = '';
+  if (versao) {
+    versaoHtml = `<span class="municipio-version">${versao}</span>`;
+  }
+  
+  button.innerHTML = `
+    <span class="municipio-name">${municipio.name}</span>
+    ${versaoHtml}
+    <span class="municipio-status">${status ? 'Online' : 'Offline'}</span>
+  `;
+  
+  button.onclick = () => {
+    window.open(municipio.url, '_blank');
+  };
+  
+  button.title = `${municipio.url} - ${status ? 'Acessível' : 'Inacessível'}${versao ? ` - Versão: ${versao}` : ''}`;
+  
+  return button;
 }
 
-// ===============================
-// EXTRAIR VERSÃO (CORRIGIDO)
-// ===============================
+// Função para extrair a versão do HTML
 function extrairVersao(html) {
-    try {
-        // Verificar se recebemos HTML válido
-        if (!html || html.length < 100) return null;
-        
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-
-        // Procurar versão em diferentes formatos
-        const versaoElement = doc.querySelector('.vmx-login-versao, .versao, .version');
-        if (versaoElement) {
-            const texto = versaoElement.textContent || '';
-            const match = texto.match(/v?(\d+\.\d+\.\d+)/i);
-            if (match) return 'v' + match[1];
-        }
-
-        // Procurar em meta tags
-        const metaVersao = doc.querySelector('meta[name="version"], meta[name="versao"]');
-        if (metaVersao) {
-            const content = metaVersao.getAttribute('content');
-            if (content) {
-                const match = content.match(/v?(\d+\.\d+\.\d+)/i);
-                if (match) return 'v' + match[1];
-            }
-        }
-
-        return null;
-    } catch {
-        return null;
+  try {
+    // Criar um parser de HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    // Procurar o elemento que contém a versão
+    const versaoElement = doc.querySelector('.vmx-login-versao');
+    if (versaoElement) {
+      // Extrair o texto e limpar
+      const texto = versaoElement.textContent || '';
+      const match = texto.match(/Versão:\s*(v[\d.]+)/i);
+      if (match && match[1]) {
+        return match[1];
+      }
+      
+      // Tentativa alternativa se o padrão for diferente
+      const versaoMatch = texto.match(/v[\d.]+/);
+      if (versaoMatch) {
+        return versaoMatch[0];
+      }
     }
+    
+    // Tentar encontrar por outros padrões comuns
+    const metaVersao = doc.querySelector('meta[name="version"], meta[name="versao"]');
+    if (metaVersao) {
+      return metaVersao.getAttribute('content');
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Erro ao extrair versão:', error);
+    return null;
+  }
 }
 
-// ===============================
-// VERIFICAR STATUS (CORRIGIDO)
-// ===============================
+// Nova função de verificação mais robusta com busca de versão
 async function verificarStatus(municipio) {
-    // Lista de proxies para tentar
-    const proxies = [
-        `https://api.allorigins.win/get?url=${encodeURIComponent(municipio.url)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(municipio.url)}`,
-        `https://cors-anywhere.herokuapp.com/${municipio.url}`
-    ];
-
-    // Tentar cada proxy
-    for (const proxyUrl of proxies) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-            const response = await fetch(proxyUrl, { 
-                signal: controller.signal,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            });
-
-            clearTimeout(timeoutId);
-
-            if (response.ok) {
-                let html = '';
-                
-                // Extrair HTML da resposta (formato diferente para cada proxy)
-                if (proxyUrl.includes('allorigins')) {
-                    const data = await response.json();
-                    html = data.contents;
-                } else {
-                    html = await response.text();
-                }
-
-                // Verificar se recebemos HTML válido (não é página de erro)
-                if (html && html.length > 500 && !html.includes('Access denied')) {
-                    const versao = extrairVersao(html);
-                    
-                    // IMPORTANTE: Se conseguimos o HTML, o site está online!
-                    // Mesmo sem versão, retornamos status true
-                    return { 
-                        status: true, 
-                        versao: versao || 'Online' 
-                    };
-                }
-            }
-        } catch (error) {
-            // Continuar para o próximo proxy
-            continue;
+  let versao = null;
+  
+  try {
+    // Tentativa 1: Usando fetch com modo 'cors' para obter HTML completo
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    try {
+      const response = await fetch(municipio.url, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Verifica se a resposta é válida (status entre 200-399)
+      if (response.status >= 200 && response.status < 400) {
+        const html = await response.text();
+        versao = extrairVersao(html);
+        return { status: true, versao };
+      }
+      return { status: false, versao: null };
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      // Se falhar com CORS, tentar método alternativo
     }
-
-    // Se todas as tentativas falharem, considerar offline
+    
+    // Tentativa 2: Usando fetch com modo 'no-cors' mas verificando tipo de erro
+    try {
+      const controller2 = new AbortController();
+      const timeoutId2 = setTimeout(() => controller2.abort(), 8000);
+      
+      const response = await fetch(municipio.url, {
+        method: 'GET',
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: controller2.signal
+      });
+      
+      clearTimeout(timeoutId2);
+      
+      // No modo 'no-cors', não podemos ler a resposta, mas podemos tentar uma requisição separada para a versão
+      // Tentar buscar apenas a versão com uma requisição específica
+      try {
+        const versaoResponse = await fetch(`${municipio.url}/api/version`, {
+          method: 'GET',
+          mode: 'no-cors',
+          signal: AbortSignal.timeout(3000)
+        }).catch(() => null);
+        
+        // Se não conseguir a versão por API, pelo menos sabemos que o site está online
+        return { status: true, versao: null };
+      } catch {
+        return { status: true, versao: null };
+      }
+    } catch (noCorsError) {
+      // Se falhar também com no-cors, provavelmente está offline
+    }
+    
+    // Tentativa 3: Usando XMLHttpRequest (mais compatível)
+    try {
+      const resultado = await new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.timeout = 8000;
+        
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 400) {
+            const versao = extrairVersao(xhr.responseText);
+            resolve({ status: true, versao });
+          } else {
+            resolve({ status: false, versao: null });
+          }
+        };
+        
+        xhr.onerror = () => resolve({ status: false, versao: null });
+        xhr.ontimeout = () => resolve({ status: false, versao: null });
+        
+        xhr.open('GET', municipio.url);
+        xhr.send();
+      });
+      
+      return resultado;
+    } catch (xhrError) {
+      return { status: false, versao: null };
+    }
+    
+  } catch (error) {
+    console.error(`Erro ao verificar ${municipio.name}:`, error);
     return { status: false, versao: null };
+  }
 }
 
-// ===============================
-// TESTAR TELEGRAM
-// ===============================
-async function testarTelegram() {
-    const feedback = document.getElementById('shareFeedback');
-    feedback.textContent = '📤 Enviando teste...';
-    feedback.style.color = 'orange';
+// Função para verificar status com múltiplas tentativas
+async function verificarStatusComTentativas(municipio, tentativas = 2) {
+  for (let i = 0; i < tentativas; i++) {
+    const resultado = await verificarStatus(municipio);
+    if (resultado.status) return resultado;
     
-    await enviarAlertaTelegram(
-        { name: "🔧 TESTE DO SISTEMA", url: window.location.href },
-        "Teste"
-    );
-    
-    feedback.textContent = '✅ Teste enviado!';
-    feedback.style.color = 'green';
-    setTimeout(() => {
-        feedback.textContent = '';
-    }, 3000);
+    // Aguardar um pouco antes de tentar novamente
+    if (i < tentativas - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  return { status: false, versao: null };
 }
 
-// ===============================
-// ATUALIZAÇÃO PRINCIPAL (CORRIGIDA)
-// ===============================
+// Atualizar painel
 async function atualizarPainel() {
-    if (atualizacaoEmAndamento) return;
-    atualizacaoEmAndamento = true;
-
-    console.log("🔄 Iniciando varredura completa...");
-
-    const novosResultados = [];
-    const concorrenciaMaxima = 3; // Reduzido para não sobrecarregar
-
-    // Processar em lotes
-    for (let i = 0; i < municipios.length; i += concorrenciaMaxima) {
-        const lote = municipios.slice(i, i + concorrenciaMaxima);
-
-        const promessas = lote.map(async (municipio) => {
-            try {
-                const resultado = await verificarStatus(municipio);
-                const chave = municipio.url;
-
-                // Verificar se houve queda (estava online e agora está offline)
-                if (statusAnterior[chave] === true && !resultado.status) {
-                    console.log(`🔴 QUEDA DETECTADA: ${municipio.name}`);
-                    await enviarAlertaTelegram(municipio, "Offline");
-                }
-
-                // Atualizar status anterior
-                statusAnterior[chave] = resultado.status;
-
-                return {
-                    municipio,
-                    status: resultado.status,
-                    versao: resultado.versao
-                };
-            } catch (error) {
-                console.error(`Erro ao verificar ${municipio.name}:`, error);
-                return {
-                    municipio,
-                    status: false,
-                    versao: null
-                };
-            }
-        });
-
-        const resolvidos = await Promise.allSettled(promessas);
-
-        resolvidos.forEach(r => {
-            if (r.status === "fulfilled") {
-                novosResultados.push(r.value);
-            }
-        });
-
-        // Atualizar resultados parciais
-        resultados = [...novosResultados];
-        todosMunicipios = [...resultados];
-
-        // Ordenar: online primeiro, depois offline
-        resultados.sort((a, b) => {
-            if (a.status && !b.status) return -1;
-            if (!a.status && b.status) return 1;
-            return 0;
-        });
-
-        renderizarMunicipios();
-
-        // Pequena pausa entre lotes
-        await new Promise(r => setTimeout(r, 300));
-    }
-
-    atualizarInfoTempo();
-    atualizacaoEmAndamento = false;
-    console.log("✅ Varredura finalizada.");
-}
-
-// ===============================
-// RENDER
-// ===============================
-function renderizarMunicipios() {
-    container.innerHTML = '';
-
-    const online = resultados.filter(r => r.status).length;
-    const offline = resultados.filter(r => !r.status).length;
-
-    const onlineEl = document.getElementById('onlineCount');
-    const offlineEl = document.getElementById('offlineCount');
-    
-    if (onlineEl) onlineEl.textContent = online;
-    if (offlineEl) offlineEl.textContent = offline;
-
-    resultados.forEach(({ municipio, status, versao }) => {
-        container.appendChild(criarBotaoMunicipio(municipio, status, versao));
-    });
-}
-
-// ===============================
-// FILTRAR MUNICÍPIOS
-// ===============================
-function filtrarMunicipios() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    
-    if (!searchTerm) {
-        resultados = [...todosMunicipios];
-    } else {
-        resultados = todosMunicipios.filter(({ municipio }) => 
-            municipio.name.toLowerCase().includes(searchTerm)
-        );
-    }
-    
-    // Manter ordenação
-    resultados.sort((a, b) => {
-        if (a.status && !b.status) return -1;
-        if (!a.status && b.status) return 1;
-        return 0;
+  console.log('Atualizando painel...');
+  
+  container.innerHTML = '<div class="loading">Carregando...</div>';
+  
+  // Verificar status de todos os municípios em paralelo, mas com limitação de concorrência
+  const statusPromises = [];
+  const concorrenciaMaxima = 5;
+  
+  for (let i = 0; i < municipios.length; i += concorrenciaMaxima) {
+    const lote = municipios.slice(i, i + concorrenciaMaxima);
+    const promisesLote = lote.map(async (municipio) => {
+      const resultado = await verificarStatusComTentativas(municipio);
+      return { municipio, status: resultado.status, versao: resultado.versao };
     });
     
+    const resultadosLote = await Promise.allSettled(promisesLote);
+    
+    resultadosLote.forEach(resultado => {
+      if (resultado.status === 'fulfilled') {
+        statusPromises.push(resultado.value);
+      } else {
+        console.error('Erro ao verificar município:', resultado.reason);
+        statusPromises.push({ 
+          municipio: resultado.reason.municipio || {name: 'Desconhecido'}, 
+          status: false,
+          versao: null
+        });
+      }
+    });
+    
+    // Atualizar interface parcialmente a cada lote
+    resultados = [...statusPromises];
+    todosMunicipios = [...resultados];
+    resultados.sort((a, b) => a.status === b.status ? 0 : a.status ? 1 : -1);
     renderizarMunicipios();
+    
+    // Pequena pausa entre lotes para não sobrecarregar
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  
+  atualizarInfoTempo();
 }
 
-// ===============================
-// COMPARTILHAR
-// ===============================
+// Renderizar municípios na tela
+function renderizarMunicipios() {
+  container.innerHTML = '';
+  
+  resultados.forEach(({ municipio, status, versao }) => {
+    const botao = criarBotaoMunicipio(municipio, status, versao);
+    container.appendChild(botao);
+  });
+}
+
+// Filtrar municípios pela barra de pesquisa
+function filtrarMunicipios() {
+  const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+  
+  if (!searchTerm) {
+    resultados = [...todosMunicipios];
+  } else {
+    resultados = todosMunicipios.filter(({ municipio }) => 
+      municipio.name.toLowerCase().includes(searchTerm)
+    );
+  }
+  
+  // Reordenar após filtrar
+  resultados.sort((a, b) => {
+    if (a.status === b.status) return 0;
+    return a.status ? 1 : -1;
+  });
+  
+  renderizarMunicipios();
+}
+
+// Função para compartilhar link do painel
 function compartilharPainel() {
-    const link = window.location.href;
-    navigator.clipboard.writeText(link)
-        .then(() => {
-            const feedback = document.getElementById('shareFeedback');
-            feedback.textContent = '✓ Link copiado!';
-            feedback.style.color = 'green';
-            setTimeout(() => {
-                feedback.textContent = '';
-            }, 2000);
-        })
-        .catch(err => {
-            console.error('Erro ao copiar link:', err);
-            alert('Erro ao copiar link. Copie manualmente: ' + window.location.href);
-        });
-}
-
-// ===============================
-// EXPORTAR
-// ===============================
-function exportarMunicipios() {
-    if (!todosMunicipios.length) {
-        alert("Aguarde o carregamento do painel.");
-        return;
-    }
-
-    let conteudo = "Lista de Municípios - " + new Date().toLocaleString() + "\n\n";
-    todosMunicipios.forEach(({ municipio, status, versao }) => {
-        conteudo += `${municipio.name}\n`;
-        conteudo += `Status: ${status ? 'Online' : 'Offline'}\n`;
-        conteudo += `Versão: ${versao || 'Não localizada'}\n`;
-        conteudo += `${municipio.url}\n\n`;
+  const link = window.location.href;
+  navigator.clipboard.writeText(link)
+    .then(() => {
+      const feedback = document.getElementById('shareFeedback');
+      feedback.textContent = '✓ Link copiado!';
+      feedback.style.color = 'green';
+      
+      setTimeout(() => {
+        feedback.textContent = '';
+      }, 2000);
+    })
+    .catch(err => {
+      console.error('Erro ao copiar link:', err);
+      alert('Erro ao copiar link. Tente manualmente: ' + window.location.href);
     });
-
-    const blob = new Blob([conteudo], { type: "text/plain;charset=utf-8" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `municipios_${new Date().toISOString().slice(0,10)}.txt`;
-    link.click();
 }
 
-// ===============================
-// INFO TEMPO
-// ===============================
+// Informação de atualização
 function atualizarInfoTempo() {
-    const agora = new Date();
-    const proxima = new Date(agora.getTime() + 5 * 60 * 1000);
-
-    updateInfo.innerHTML = `
-        <div>Última atualização: <strong>${agora.toLocaleTimeString()}</strong></div>
-        <div>Próxima atualização: <strong>${proxima.toLocaleTimeString()}</strong></div>
-        <div>Atualização automática a cada 5 minutos</div>
-        <div style="margin-top: 10px; font-size: 12px; color: #00ff88;">
-            📱 Telegram: ${TELEGRAM_CONFIGS.length} bots ativos
-        </div>
-    `;
+  const agora = new Date();
+  const proxima = new Date(agora.getTime() + 5 * 60 * 1000);
+  
+  updateInfo.innerHTML = `
+    <div>Última atualização: <strong>${agora.toLocaleTimeString()}</strong></div>
+    <div>Próxima atualização: <strong>${proxima.toLocaleTimeString()}</strong></div>
+    <div>Atualização automática a cada 5 minutos</div>
+  `;
 }
 
-// ===============================
-// LOOP PRINCIPAL
-// ===============================
-async function iniciarPainel() {
-    // Primeira execução imediata
-    await atualizarPainel();
-
-    // Loop a cada 5 minutos
-    setInterval(async () => {
-        console.log("⏰ Iniciando nova verificação...");
-        await atualizarPainel();
-    }, 5 * 60 * 1000);
+// Inicializar e configurar intervalo
+function iniciarPainel() {
+  atualizarPainel();
+  setInterval(atualizarPainel, 5 * 60 * 1000); // 5 minutos
+  
+  // Atualizar contador a cada minuto
+  setInterval(atualizarInfoTempo, 60000);
 }
 
-// ===============================
-// START
-// ===============================
+// Iniciar quando carregar
+document.addEventListener('DOMContentLoaded', iniciarPainel);
+
+// Também iniciar se já estiver carregado
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', iniciarPainel);
+  document.addEventListener('DOMContentLoaded', iniciarPainel);
 } else {
-    iniciarPainel();
+  iniciarPainel();
 }
 
-// Exportar funções para o escopo global
-window.filtrarMunicipios = filtrarMunicipios;
-window.compartilharPainel = compartilharPainel;
-window.exportarMunicipios = exportarMunicipios;
-window.testarTelegram = testarTelegram;
+// Função para exportar lista de municípios e versões em TXT
+function exportarMunicipios() {
+  if (!todosMunicipios.length) {
+    alert("Aguarde o carregamento do painel.");
+    return;
+  }
+
+  let conteudo = "Lista de Municípios - " + new Date().toLocaleString() + "\n\n";
+  todosMunicipios.forEach(({ municipio, versao }) => {
+    conteudo += `${municipio.name}\n`;
+    conteudo += `Versão: ${versao ? versao : "Não localizada"}\n\n`;
+  });
+
+  const blob = new Blob([conteudo], { type: "text/plain;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "municipios.txt";
+  link.click();
+}
